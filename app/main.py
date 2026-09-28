@@ -1,7 +1,21 @@
 from fastapi import FastAPI
 import psutil
+import os
 
 app = FastAPI()
+
+def ping():
+    os.system('clear')
+    ip = "192.168.18.0".split('.')
+    ip_list = []
+    for i in range (0, 23):
+        ip [3] = str(i)
+        ip_formatado = '.'.join(ip)
+        rs = os.system('ping -c 1 {}'.format(ip_formatado))
+        if rs == 0:
+            ip_list.append(ip_formatado)
+    return(ip_list)
+            
 
 @app.get("/")
 def read_root():
@@ -18,3 +32,11 @@ def read_ram():
 @app.get("/system/disk")
 def read_disk():
     return{"disk": psutil.disk_usage('/')}
+
+@app.get("/system/users")
+def read_users():
+    return{"users": psutil.users()}
+
+@app.get("/system/network/devices")
+def read_network():
+    return{"dispositivos": ping()}
