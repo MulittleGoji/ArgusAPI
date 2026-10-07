@@ -1,181 +1,58 @@
-# Argus
+# ARGUS
 
-**Argus** is a lightweight system monitoring API built with Python and FastAPI.
+> PC Monitoring API — monitor your computer through an API.
 
-The project provides HTTP endpoints for retrieving real-time information about the host system, with the long-term goal of evolving into a complete remote monitoring solution.
+**Argus** is an API developed in Python for monitoring computer resources.
 
----
-
-## Overview
-
-Argus exposes system metrics through a REST API, allowing compatible clients to retrieve information about the machine where the service is running.
-
-Current monitoring capabilities include:
-
-* CPU utilization
-* CPU core count
-* Memory information
-* Disk usage
-
-The API is designed to be accessed locally or from other devices on the same network.
-
-```text
-┌──────────────────────┐
-│   Client / Browser   │
-│  Mobile / Dashboard  │
-└──────────┬───────────┘
-           │ HTTP
-           ▼
-┌──────────────────────┐
-│        Argus         │
-│      FastAPI API     │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│      Host System     │
-│ CPU · RAM · Storage  │
-└──────────────────────┘
-```
+The idea behind the project is to gradually turn Argus into a system capable of collecting, organizing, and providing information about a computer through an API accessible locally or over a network.
 
 ---
 
-## Features
+## 🚧 Status
 
-### System Monitoring
+**In development**
 
-| Resource    | Endpoint           | Status    |
-| ----------- | ------------------ | --------- |
-| CPU         | `GET /system/cpu`  | Available |
-| Memory      | `GET /system/ram`  | Available |
-| Disk        | `GET /system/disk` | Available |
-| Swap        | —                  | Planned   |
-| Processes   | —                  | Planned   |
-| Network     | —                  | Planned   |
-| GPU         | —                  | Planned   |
-| Temperature | —                  | Planned   |
+The project is still in its early stages and is being developed as a learning project, focusing on Python, APIs, networking, data persistence, and infrastructure.
 
 ---
 
-## API
+## 🎯 Objective
 
-### CPU
-
-```http
-GET /system/cpu
-```
-
-Returns information about the current CPU utilization and available CPU cores.
+The goal of Argus is to allow computer information to be accessed remotely through an API.
 
 Example:
 
-```json
-{
-  "cpu_percent": 16.0,
-  "cpu_cores": 8
-}
+```text
+Phone / another computer
+          ↓
+       HTTP Request
+          ↓
+        Argus
+          ↓
+       FastAPI
+          ↓
+       System
 ```
 
-### Memory
-
-```http
-GET /system/ram
-```
-
-Returns information about system memory.
-
-### Disk
-
-```http
-GET /system/disk
-```
-
-Returns information about disk usage.
+In the long term, the project may evolve into a complete monitoring system, including historical data, authentication, and its own interface.
 
 ---
 
-## API Documentation
+## 🛠️ Technologies
 
-Argus uses FastAPI's automatic interactive documentation.
-
-When the server is running, the documentation is available at:
-
-```text
-http://127.0.0.1:8000/docs
-```
-
-The OpenAPI schema is available at:
-
-```text
-http://127.0.0.1:8000/openapi.json
-```
-
----
-
-## Network Access
-
-Argus can be accessed from other devices on the same local network when the server is configured to listen on the network interface.
-
-For example:
-
-```text
-http://192.168.18.19:8000/system/cpu
-```
-
-The IP address shown above is only an example and depends on the host's current network configuration.
-
-Remote access through a private network such as Tailscale is planned for a future stage.
-
----
-
-## Requirements
-
-* Python 3
+* Python
 * FastAPI
 * Uvicorn
 * psutil
+* subprocess
+* ThreadPoolExecutor
 * uv
+* SQLite (planned)
+* Tailscale (planned)
 
 ---
 
-## Installation
-
-Clone the repository and enter the project directory:
-
-```bash
-git clone <repository-url>
-cd Argus
-```
-
-Create and activate a virtual environment according to your Python environment.
-
-Install the project dependencies with `uv`.
-
----
-
-## Running
-
-Start the development server with:
-
-```bash
-uv run fastapi dev
-```
-
-Once running, the API will be available locally at:
-
-```text
-http://127.0.0.1:8000
-```
-
-For development, FastAPI's interactive documentation can be accessed through:
-
-```text
-http://127.0.0.1:8000/docs
-```
-
----
-
-## Project Structure
+## 📁 Structure
 
 ```text
 Argus/
@@ -184,124 +61,255 @@ Argus/
 │   └── main.py
 ├── tests/
 │   └── __init__.py
-├── .gitignore
-├── README.txt
 ├── pyproject.toml
+├── uv.lock
 ├── requirements.txt
-└── uv.lock
+├── README.txt
+└── .gitignore
 ```
 
 ---
 
-## Roadmap
+## 📡 Current Endpoints
+
+### Root
+
+```http
+GET /
+```
+
+Returns a basic response to verify that the API is running.
+
+### CPU
+
+```http
+GET /system/cpu
+```
+
+Returns information about the processor, such as:
+
+* CPU usage
+* number of CPU cores
+
+### RAM
+
+```http
+GET /system/ram
+```
+
+Returns information about the system's RAM.
+
+### Disk
+
+```http
+GET /system/disk
+```
+
+Returns information about the system's storage.
+
+### User and System
+
+```http
+GET /system/users
+```
+
+Returns information about the currently logged-in user and the computer's uptime.
+
+Example:
+
+```json
+{
+    "users": "murilo",
+    "uid": 1000,
+    "uptime": "up 8 hours, 59 minutes"
+}
+```
+
+The uptime information is obtained directly from the operating system.
+
+### Processes
+
+```http
+GET /system/processes
+```
+
+Returns information about the processes currently running on the system.
+
+Currently, the following information is collected:
+
+* process ID (PID)
+* process name
+* process user
+
+Process information is collected using `psutil.process_iter()`.
+
+### Network Devices
+
+```http
+GET /system/network/devices
+```
+
+Scans the local network and returns the IP addresses that responded to a ping.
+
+Argus uses `ThreadPoolExecutor` to execute network tests concurrently.
+
+Example:
+
+```json
+{
+    "dispositivos": [
+        "192.168.18.1",
+        "192.168.18.5",
+        "192.168.18.10",
+        "192.168.18.19"
+    ]
+}
+```
+
+### Shutdown
+
+```http
+GET /system/shutdown
+```
+
+Requests the computer to shut down through the operating system.
+
+Currently uses:
+
+```text
+systemctl poweroff
+```
+
+> This endpoint should be protected with authentication before making the API available outside the local network.
+
+---
+
+## 🌐 Network Access
+
+Argus can be accessed over the local network.
+
+Example:
+
+```text
+http://192.168.18.19:8000/system/cpu
+```
+
+The IP address depends on the network where the computer is connected.
+
+Currently, remote access is limited to the local network.
+
+Internet access is not part of the current configuration.
+
+---
+
+## ▶️ Running
+
+With the virtual environment configured:
+
+```bash
+uv run fastapi dev
+```
+
+During development, the API can be accessed at:
+
+```text
+http://127.0.0.1:8000
+```
+
+The interactive FastAPI documentation is available at:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+To access the API from the local network, use the computer's IP address:
+
+```text
+http://COMPUTER_IP:8000
+```
+
+---
+
+## 🔭 Roadmap
 
 ### Monitoring
 
-* [x] CPU metrics
-* [x] Memory metrics
-* [x] Disk metrics
-* [ ] Swap metrics
-* [ ] Process monitoring
-* [ ] Network statistics
-* [ ] GPU monitoring
-* [ ] Temperature monitoring
+* [x] CPU
+* [x] RAM
+* [x] Disk
+* [x] User and UID
+* [x] Uptime
+* [x] Processes
+* [x] Network devices
+* [ ] Swap
+* [ ] Detailed network information
+* [ ] Temperature
+* [ ] GPU
 
 ### API
 
-* [x] FastAPI foundation
+* [x] Basic API
 * [x] System endpoints
-* [ ] Response models
-* [ ] Input validation
+* [ ] Validation and models
 * [ ] Error handling
 * [ ] Authentication
-* [ ] Authorization
+* [ ] Permissions
 
-### Data
+### Persistence
 
-* [ ] SQLite integration
-* [ ] Metric history
+* [ ] SQLite
+* [ ] Metrics history
 * [ ] Historical queries
-* [ ] Data retention
+* [ ] Automatic cleanup of old data
 
 ### Remote Access
 
-* [x] Localhost access
 * [x] Local network access
-* [ ] Private remote access
-* [ ] Tailscale integration
+* [ ] Tailscale
+* [ ] Monitoring outside the local network
 
 ### Interface
 
-* [ ] Web dashboard
-* [ ] Real-time metrics
-* [ ] Historical charts
-* [ ] Mobile-friendly interface
+* [ ] Dashboard
+* [ ] Charts
+* [ ] Usage history
+* [ ] Custom interface
 
 ---
 
-## Architecture Goals
+## 📚 What I'm Learning
 
-As the project evolves, Argus aims to separate its responsibilities into distinct layers:
-
-```text
-Client
-  │
-  ▼
-API
-  │
-  ▼
-Monitoring Services
-  │
-  ├── CPU
-  ├── Memory
-  ├── Disk
-  ├── Network
-  └── Processes
-  │
-  ▼
-Persistence
-  │
-  └── SQLite
-```
-
-This structure is intended to make the project easier to maintain, test, and extend.
-
----
-
-## Development
-
-Argus is developed incrementally, with an emphasis on understanding the underlying concepts rather than relying on abstractions without understanding their purpose.
-
-The project serves as a practical environment for exploring:
+Argus is also a practical project for learning:
 
 * Python
-* REST APIs
-* FastAPI
+* API development
 * HTTP
+* FastAPI
 * JSON
-* Linux system information
 * Networking
-* Database design
+* Linux
+* Databases
 * Authentication
-* Testing
-* Git
-* Remote infrastructure
+* Git and GitHub
+* Infrastructure
+* System monitoring
+* Concurrency
+* Operating system processes
 
 ---
 
-## Project Status
+## 📌 Project Philosophy
 
-**Early Development**
+Argus is being built incrementally.
 
-The API is functional and capable of exposing basic system metrics. Architecture, endpoints, data models, persistence, authentication, and remote access are expected to evolve as development continues.
+The idea is to understand each part of the system before adding new layers of complexity.
 
----
-
-## License
-
-License information will be added as the project matures.
+> **Observe. Understand. Build. Monitor.**
 
 ---
 
-**Argus**
-*System monitoring, exposed through an API.*
+## 👤 Author
+
+**Murilo**
+
+Personal project developed for learning and experimentation.
