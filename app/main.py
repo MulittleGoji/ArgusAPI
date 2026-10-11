@@ -1,12 +1,13 @@
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 import psutil
 import os
 from concurrent.futures import ThreadPoolExecutor
 import concurrent.futures
 import pwd
 import subprocess
+import app.auth as auth
 
-app = FastAPI()
+app = FastAPI(dependencies= [Depends(auth.verify_api_key)])
 
 def ping():
     os.system('clear')
@@ -60,7 +61,7 @@ def read_users():
 def read_network():
     return{"dispositivos": ping()}
 
-@app.get('/system/shutdown')
+@app.post('/system/shutdown')
 def shutdown_system():
     shutdown()
     return 'PC desligado'
@@ -68,7 +69,7 @@ def shutdown_system():
 @app.get('/system/processes')
 def get_processes():
     processes = []
-    for proc in psutil.process_iter(['pid\n','name\n','username\n']):
+    for proc in psutil.process_iter(['pid','name','username']):
         processes.append(proc.info)
 
     return {'processes': processes}
