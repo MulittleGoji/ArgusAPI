@@ -47,6 +47,7 @@ Because the network is derived from the host's own configuration, the same code 
 |---|---|
 | Language | Python |
 | Web framework | FastAPI, Uvicorn |
+| Configuration | pydantic-settings (`.env`) |
 | System information | psutil |
 | Networking | `ipaddress`, `socket`, `subprocess` |
 | Concurrency | `concurrent.futures.ThreadPoolExecutor` |
@@ -62,9 +63,11 @@ Argus/
 ├── app/
 │   ├── __init__.py
 │   ├── auth.py        # API key verification
+│   ├── config.py      # settings loaded from environment / .env
 │   └── main.py        # routes and network scan logic
 ├── tests/
 │   └── __init__.py
+├── .env.example       # template for the required environment variables
 ├── pyproject.toml
 ├── uv.lock
 ├── requirements.txt
@@ -88,6 +91,9 @@ Argus/
 # install dependencies
 uv sync
 
+# create your .env with ARGUS_API_KEY (see "Authentication" below)
+cp .env.example .env
+
 # run in development mode
 uv run fastapi dev
 ```
@@ -102,11 +108,27 @@ http://<COMPUTER_IP>:8000
 
 ### Authentication
 
-All endpoints require an API key. Configure it as described in `app/auth.py` and send it with every request:
+All endpoints require an API key, checked by a global FastAPI dependency (`app/auth.py`). The key is read from the `ARGUS_API_KEY` environment variable (`app/config.py`, using `pydantic-settings`), which can be defined in a `.env` file at the project root.
 
-```bash
-curl -H "X-API-Key: <your-key>" http://127.0.0.1:8000/system/cpu
-```
+1. Generate a key:
+
+   ```bash
+   python -c "import secrets; print(secrets.token_hex(32))"
+   ```
+
+2. Create a `.env` file (it is ignored by Git) based on `.env.example`:
+
+   ```text
+   ARGUS_API_KEY=<your-generated-key>
+   ```
+
+3. Send the key in the `api_key` header with every request:
+
+   ```bash
+   curl -H "api_key: <your-generated-key>" http://127.0.0.1:8000/system/cpu
+   ```
+
+Requests with a missing or wrong key are rejected (`401 Unauthorized` for a wrong key; FastAPI also rejects requests with no header).
 
 ---
 
@@ -194,6 +216,7 @@ curl -H "X-API-Key: <your-key>" http://127.0.0.1:8000/system/cpu
 - [x] Basic API
 - [x] System endpoints
 - [x] API key authentication
+- [ ] Easier API key generation and management
 - [ ] Validation and response models
 - [ ] Error handling
 - [ ] Permissions per endpoint
