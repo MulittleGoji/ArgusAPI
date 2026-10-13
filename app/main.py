@@ -6,26 +6,42 @@ import concurrent.futures
 import pwd
 import subprocess
 import app.auth as auth
+import socket
+import ipaddress
 
-app = FastAPI(dependencies= [Depends(auth.verify_api_key)])
+app = FastAPI(dependencies=[Depends(auth.verify_api_key)])
+
+def find_hosts():
+    cmd = psutil.net_if_addrs()
+    ip_list = []
+    for interface in cmd:
+        for address in cmd[interface]:
+            if address.family == socket.AF_INET:
+                if address.netmask == '255.255.255.255':
+                    continue
+                if address.address.startswith('127.'):
+                    continue
+                ipmask = (address.address) + ('/') + (address.netmask)
+                ips = ipaddress.IPv4Interface(ipmask)
+                for ip in ips.network.hosts():
+                    ip_list.append(ip)
+    return ip_list    
 
 def ping():
-    os.system('clear')
-    ip = "192.168.18.0".split('.')
+    hosts = find_hosts()
     ip_list = []
     future_to_ip = {}
     with ThreadPoolExecutor(max_workers=128) as executor:
-        for i in range(0, 255):
-            ip [3] = str(i)
-            ip_formatado = '.'.join(ip)
-            func = os.system
-            future = executor.submit(func, 'ping -c 1 {}'.format(ip_formatado))
-            future_to_ip[future] = ip_formatado
+        for host in hosts:    
+            func = subprocess.run
+            cmd = ['ping', '-c', '1','-W', '1', str(host)]
+            future = executor.submit(func, cmd, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)
+            future_to_ip[future] = str(host)
         for future in concurrent.futures.as_completed(future_to_ip):
             rs = future.result()
-            if rs == 0:
+            if rs.returncode == 0:
                 ip_list.append(future_to_ip[future])
-    return ip_list
+    return(ip_list)
 
 def shutdown():
     os.system('clear')
