@@ -1,121 +1,141 @@
-# ARGUS
+# Argus
 
-> PC Monitoring API — monitor your computer through an API.
+> PC monitoring API: check your computer's resources and local network from anywhere through HTTP.
 
-**Argus** is an API developed in Python for monitoring computer resources.
+![Python](https://img.shields.io/badge/Python-3.x-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![Status](https://img.shields.io/badge/status-in%20development-orange)
 
-The idea behind the project is to gradually turn Argus into a system capable of collecting, organizing, and providing information about a computer through an API accessible locally or over a network.
+Argus is a REST API written in Python that collects and exposes information about the machine it runs on: CPU, memory, disk, processes, network interfaces and the devices connected to the local network.
 
----
-
-## 🚧 Status
-
-**In development**
-
-The project is still in its early stages and is being developed as a learning project, focusing on Python, APIs, networking, data persistence, and infrastructure.
+The goal is to grow it step by step into a complete monitoring system, with historical data, remote access and its own dashboard.
 
 ---
 
-## 🎯 Objective
+## Features
 
-The goal of Argus is to allow computer information to be accessed remotely through an API.
+- **System metrics**: CPU, RAM, disk, uptime, current user and running processes.
+- **Network interfaces**: addresses and netmasks of every interface on the host.
+- **Automatic network discovery**: the API detects the host's own network (IP and netmask), so it works on any machine or network without configuration. Loopback and `/32` interfaces (such as VPN tunnels) are ignored.
+- **Concurrent device scan**: hosts are probed in parallel with `ThreadPoolExecutor`, with a 1-second timeout per host.
+- **API key authentication**: every route is protected by a global dependency.
+- **Remote power control**: shutdown endpoint (see the security notes below).
 
-Example:
+---
+
+## How the network scan works
 
 ```text
-Phone / another computer
-          ↓
-       HTTP Request
-          ↓
-        Argus
-          ↓
-       FastAPI
-          ↓
-       System
+psutil.net_if_addrs()
+        ↓
+Filter IPv4 interfaces (skip loopback and /32)
+        ↓
+ipaddress.IPv4Interface(ip/netmask) → network → hosts
+        ↓
+ThreadPoolExecutor (128 workers) → ping -c 1 -W 1 <host>
+        ↓
+Hosts that answered (return code 0)
 ```
 
-In the long term, the project may evolve into a complete monitoring system, including historical data, authentication, and its own interface.
+Because the network is derived from the host's own configuration, the same code works on a `192.168.x.x`, `10.x.x.x` or `172.16.x.x` network, whatever the prefix length.
 
 ---
 
-## 🛠️ Technologies
+## Tech stack
 
-* Python
-* FastAPI
-* Uvicorn
-* psutil
-* subprocess
-* ThreadPoolExecutor
-* uv
-* SQLite (planned)
-* Tailscale (planned)
+| Area | Tools |
+|---|---|
+| Language | Python |
+| Web framework | FastAPI, Uvicorn |
+| System information | psutil |
+| Networking | `ipaddress`, `socket`, `subprocess` |
+| Concurrency | `concurrent.futures.ThreadPoolExecutor` |
+| Packaging | uv |
+| Planned | SQLite, Tailscale |
 
 ---
 
-## 📁 Structure
+## Project structure
 
 ```text
 Argus/
 ├── app/
 │   ├── __init__.py
-│   └── main.py
+│   ├── auth.py        # API key verification
+│   └── main.py        # routes and network scan logic
 ├── tests/
 │   └── __init__.py
 ├── pyproject.toml
 ├── uv.lock
 ├── requirements.txt
-├── README.txt
+├── README.md
 └── .gitignore
 ```
 
 ---
 
-## 📡 Current Endpoints
+## Requirements
 
-### Root
+- Linux (the project uses `systemctl`, `uptime -p`, `pwd` and the Linux `ping` flags)
+- Python 3.x
+- [uv](https://docs.astral.sh/uv/)
 
-```http
-GET /
+---
+
+## Getting started
+
+```bash
+# install dependencies
+uv sync
+
+# run in development mode
+uv run fastapi dev
 ```
 
-Returns a basic response to verify that the API is running.
+The API is available at `http://127.0.0.1:8000` and the interactive documentation at `http://127.0.0.1:8000/docs`.
 
-### CPU
+To reach it from another device on the same network, use the host's IP address:
 
-```http
-GET /system/cpu
+```text
+http://<COMPUTER_IP>:8000
 ```
 
-Returns information about the processor, such as:
+### Authentication
 
-* CPU usage
-* number of CPU cores
+All endpoints require an API key. Configure it as described in `app/auth.py` and send it with every request:
 
-### RAM
-
-```http
-GET /system/ram
+```bash
+curl -H "X-API-Key: <your-key>" http://127.0.0.1:8000/system/cpu
 ```
 
-Returns information about the system's RAM.
+---
 
-### Disk
+## Endpoints
 
-```http
-GET /system/disk
+| Method | Route | Description |
+|---|---|---|
+| GET | `/` | Health check |
+| GET | `/network` | Addresses of all network interfaces |
+| GET | `/system/cpu` | CPU usage and core count |
+| GET | `/system/ram` | Virtual memory information |
+| GET | `/system/disk` | Disk usage of `/` |
+| GET | `/system/users` | Current user, UID and uptime |
+| GET | `/system/processes` | Running processes (PID, name, user) |
+| GET | `/system/network/devices` | Devices on the local network that answered a ping |
+| POST | `/system/shutdown` | Shuts the computer down |
+
+### Examples
+
+**`GET /system/cpu`**
+
+```json
+{
+    "cpu_percent": 4.2,
+    "cpu_cores": 8
+}
 ```
 
-Returns information about the system's storage.
-
-### User and System
-
-```http
-GET /system/users
-```
-
-Returns information about the currently logged-in user and the computer's uptime.
-
-Example:
+**`GET /system/users`**
 
 ```json
 {
@@ -125,191 +145,88 @@ Example:
 }
 ```
 
-The uptime information is obtained directly from the operating system.
-
-### Processes
-
-```http
-GET /system/processes
-```
-
-Returns information about the processes currently running on the system.
-
-Currently, the following information is collected:
-
-* process ID (PID)
-* process name
-* process user
-
-Process information is collected using `psutil.process_iter()`.
-
-### Network Devices
-
-```http
-GET /system/network/devices
-```
-
-Scans the local network and returns the IP addresses that responded to a ping.
-
-Argus uses `ThreadPoolExecutor` to execute network tests concurrently.
-
-Example:
+**`GET /system/network/devices`**
 
 ```json
 {
     "dispositivos": [
         "192.168.18.1",
         "192.168.18.5",
-        "192.168.18.10",
         "192.168.18.19"
     ]
 }
 ```
 
-### Shutdown
+---
 
-```http
-GET /system/shutdown
-```
+## Security notes
 
-Requests the computer to shut down through the operating system.
-
-Currently uses:
-
-```text
-systemctl poweroff
-```
-
-> This endpoint should be protected with authentication before making the API available outside the local network.
+- `POST /system/shutdown` powers off the machine. Keep it behind authentication and do not expose the API to the internet without additional protection.
+- Remote access is currently limited to the local network. Access from outside is planned through Tailscale.
 
 ---
 
-## 🌐 Network Access
+## Known limitations
 
-Argus can be accessed over the local network.
-
-Example:
-
-```text
-http://192.168.18.19:8000/system/cpu
-```
-
-The IP address depends on the network where the computer is connected.
-
-Currently, remote access is limited to the local network.
-
-Internet access is not part of the current configuration.
+- **Devices that block ICMP do not appear in the scan.** The scan relies on ping, so hosts with a firewall that drops echo requests are reported as offline. Reading the ARP table is planned to fix this on local networks.
+- **No size limit for large networks.** On a `/16` network the scan would probe about 65,000 hosts. A cap on the number of hosts is planned.
+- **Linux only.**
 
 ---
 
-## ▶️ Running
-
-With the virtual environment configured:
-
-```bash
-uv run fastapi dev
-```
-
-During development, the API can be accessed at:
-
-```text
-http://127.0.0.1:8000
-```
-
-The interactive FastAPI documentation is available at:
-
-```text
-http://127.0.0.1:8000/docs
-```
-
-To access the API from the local network, use the computer's IP address:
-
-```text
-http://COMPUTER_IP:8000
-```
-
----
-
-## 🔭 Roadmap
+## Roadmap
 
 ### Monitoring
-
-* [x] CPU
-* [x] RAM
-* [x] Disk
-* [x] User and UID
-* [x] Uptime
-* [x] Processes
-* [x] Network devices
-* [ ] Swap
-* [ ] Detailed network information
-* [ ] Temperature
-* [ ] GPU
+- [x] CPU
+- [x] RAM
+- [x] Disk
+- [x] User, UID and uptime
+- [x] Processes
+- [x] Network interfaces
+- [x] Network devices with automatic network discovery
+- [ ] Device discovery through the ARP table (devices that block ping)
+- [ ] Host limit for large networks
+- [ ] Swap
+- [ ] Temperature
+- [ ] GPU
 
 ### API
-
-* [x] Basic API
-* [x] System endpoints
-* [ ] Validation and models
-* [ ] Error handling
-* [ ] Authentication
-* [ ] Permissions
+- [x] Basic API
+- [x] System endpoints
+- [x] API key authentication
+- [ ] Validation and response models
+- [ ] Error handling
+- [ ] Permissions per endpoint
+- [ ] Automated tests
 
 ### Persistence
+- [ ] SQLite
+- [ ] Metrics history
+- [ ] Historical queries
+- [ ] Automatic cleanup of old data
 
-* [ ] SQLite
-* [ ] Metrics history
-* [ ] Historical queries
-* [ ] Automatic cleanup of old data
-
-### Remote Access
-
-* [x] Local network access
-* [ ] Tailscale
-* [ ] Monitoring outside the local network
+### Remote access
+- [x] Local network access
+- [ ] Tailscale
+- [ ] Monitoring outside the local network
 
 ### Interface
-
-* [ ] Dashboard
-* [ ] Charts
-* [ ] Usage history
-* [ ] Custom interface
+- [ ] Dashboard
+- [ ] Charts
+- [ ] Usage history
 
 ---
 
-## 📚 What I'm Learning
+## What I'm learning
 
-Argus is also a practical project for learning:
+Argus is a learning project. It is helping me practice API design with FastAPI, networking fundamentals (IP, subnets, ICMP, ARP), concurrency, Linux system internals, authentication, Git and, soon, databases and infrastructure.
 
-* Python
-* API development
-* HTTP
-* FastAPI
-* JSON
-* Networking
-* Linux
-* Databases
-* Authentication
-* Git and GitHub
-* Infrastructure
-* System monitoring
-* Concurrency
-* Operating system processes
-
----
-
-## 📌 Project Philosophy
-
-Argus is being built incrementally.
-
-The idea is to understand each part of the system before adding new layers of complexity.
+The project is built incrementally: understand each part before adding the next layer.
 
 > **Observe. Understand. Build. Monitor.**
 
 ---
 
-## 👤 Author
+## Author
 
-**Murilo**
-
-Personal project developed for learning and experimentation.
+**Murilo**: personal project for learning and experimentation.
