@@ -191,7 +191,7 @@ Requests with a missing or wrong key are rejected (`401 Unauthorized` for a wron
 ## Known limitations
 
 - **Devices that block ICMP do not appear in the scan.** The scan relies on ping, so hosts with a firewall that drops echo requests are reported as offline. Reading the ARP table is planned to fix this on local networks.
-- **No size limit for large networks.** On a `/16` network the scan would probe about 65,000 hosts. A cap on the number of hosts is planned.
+- - **Networks larger than /24 are skipped.** Interfaces such as docker0 (/16) would make the scan probe tens of thousands of hosts.
 - **Linux only.**
 
 ---
