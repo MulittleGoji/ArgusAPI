@@ -9,7 +9,7 @@ import app.auth as auth
 import socket
 import ipaddress
 
-app = FastAPI(dependencies=[Depends(auth.verify_api_key)])
+app = FastAPI(dependencies=[Depends(auth.verify_api_key)], docs_url=None, redoc_url=None, openapi_url=None)
 
 def find_hosts():
     cmd = psutil.net_if_addrs()
@@ -23,6 +23,8 @@ def find_hosts():
                     continue
                 ipmask = (address.address) + ('/') + (address.netmask)
                 ips = ipaddress.IPv4Interface(ipmask)
+                if ips.network.prefixlen < 24:
+                    continue
                 for ip in ips.network.hosts():
                     ip_list.append(ip)
     return ip_list    
